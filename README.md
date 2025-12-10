@@ -67,10 +67,25 @@ python mountain_car.py --render --episodes 10
 ```
 
 ### **Part 2: Frozen Lake**
-Run the Frozen Lake environment:
-
+從零開始訓練一個新的 Agent，訓練完成後會自動儲存最佳模型至frozen_lake8x8.pkl並繪製訓練曲線圖。
+我以Tabular Q-Learning為主，結合Epsilon-Greedy，最後再用雙重線性衰減來優化。有使用了OOP的設計架構。
 ```bash
-python frozen_lake.py
+# 預設training(15,000 episodes)
+python frozen_lake.py --train
+
+# 可自訂回合數
+python frozen_lake.py --train --episodes 10000
+
+#實際跑十次
+python frozen_lake.py --render
+```
+
+我有另外寫個測試用腳本
+```bash
+python test.py
+
+#快速跑完 1000 回合並計算最終平均勝率
+python test.py --benchmark
 ```
 
 ### **Part 3: OOP Project Environment**
@@ -89,3 +104,6 @@ with
 ```bash
 .venv\Scripts\activate
 ```
+---
+# Contribute
+aceyang108 : part2(frozen_lake.py, test.py)
