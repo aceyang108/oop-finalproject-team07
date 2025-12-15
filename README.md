@@ -88,22 +88,41 @@ python test.py
 python test.py --benchmark
 ```
 
-### **Part 3: OOP Project Environment**
-Execute the custom OOP environment:
+### **Part 3: Crossy Road AI Agent (RL & OOP)**
 
-```bash
-python oop_project_env.py
-```
+This project implements a Reinforcement Learning agent (DQN) using `Stable-Baselines3` and `Gymnasium`. The environment and agent are structured using OOP principles.
 
-**Tip:**  
-If you’re on Windows, replace  
-```bash
-source .venv/bin/activate
-```  
-with  
-```bash
-.venv\Scripts\activate
-```
+### **1. Install Dependencies**
+
+Ensure you have the required packages installed:
+
+Bash
+
+`pip install gymnasium numpy pygame stable-baselines3 shimmy tensorboard`
+
+### **2. Run the Agent**
+
+The main entry point is `agent.py`. It handles both training and evaluation.
+
+Bash
+
+`python agent.py`
+
+After running the command, you will be prompted to select a mode:
+
+- **`train`**: Starts training the AI model from scratch (or continues if a model exists). No game window will appear to speed up training.
+- **`play`**: Loads the trained model and renders the game, letting you watch the AI play in real-time.
+- **`benchmark`**: Runs a random agent for comparison.
+
+### **3. Monitor Training (TensorBoard)**
+
+To visualize training progress (Win rate, Average reward, Loss), run TensorBoard in a separate terminal:
+
+Bash
+
+`tensorboard --logdir ./logs/`
+
+Then open your browser and go to: [http://localhost:6006/](https://www.google.com/search?q=http://localhost:6006/)
 ---
 # Contribute
 aceyang108 : part2(frozen_lake.py, test.py)
