@@ -5,6 +5,7 @@ from gymnasium.utils.env_checker import check_env
 
 import crossy_road as cr
 import numpy as np
+import random
 
 # Register this module as a gym environment. Once registered, the id is usable in gym.make().
 register(
@@ -20,116 +21,164 @@ class CrossyRoadEnv(gym.Env):
     # render_fps is not used in our env, but we are require to declare a non-zero value.
     metadata = {"render_modes": ["human"], 'render_fps': 2}
 
-    def __init__(self, grid_rows=10, grid_cols=5, render_mode=None):
+    def __init__(self, grid_rows=10, grid_cols=11, render_mode=None):
 
         self.grid_rows=grid_rows
         self.grid_cols=grid_cols
         self.render_mode = render_mode
 
         # Initialize the CrossyRoad problem
-        self.crossy_road = cr.CrossyRoad(grid_rows=grid_rows, grid_cols=grid_cols, fps=self.metadata['render_fps'], road_count=2, rand_seed=217201)
-
-        # Gym requires defining the action space. The action space is robot's set of possible actions.
-        # Training code can call action_space.sample() to randomly select an action. 
+        # ✅ 必須明確傳入 grid_rows, grid_cols 等參數
+        self.crossy_road = cr.CrossyRoad(
+            grid_rows=grid_rows, 
+            grid_cols=grid_cols, 
+            fps=self.metadata['render_fps'], 
+            road_count=6, 
+            rand_seed=None
+        )
         self.action_space = spaces.Discrete(len(cr.PedestrianAction))
-        # Gym requires defining the observation space. The observation space consists of the robot's and target's set of possible positions.
-        # The observation space is used to validate the observation returned by reset() and step().
-        # Use a 1D vector: [robot_row_pos, robot_col_pos, target_row_pos, target_col_pos]
+        
+        self.max_roads = 10 
+        self.max_cars = 20
+        self.max_episode_steps = 200
+        
+        # 【修改點】每台車的特徵從 3 個變成了 5 個 (Row, Col, Dir, Speed, Length)
+        # 公式：4 + (路數 * 2) + (車數 * 5)
+        self.max_obs_len = 4 + (self.max_roads * 2) + (self.max_cars * 5)
+        
         self.observation_space = spaces.Box(
-            low=0,
-            high=np.array([self.grid_rows-1, self.grid_cols-1, self.grid_rows-1, self.grid_cols-1]),
-            shape=(4,),
+            low=-999,
+            high=999,
+            shape=(self.max_obs_len,),
             dtype=np.int32
         )
 
     # Get the observation state:
     # [pedestrian_row_pos, pedestrian_col_pos, goal_row, road_count, road_rows, road_direction (for each road), car_row_pos, car_col_pos, car_direction (for each car)]
     def _get_obs(self):
-        obs = np.concatenate((self.crossy_road.pedestrian_pos, [self.crossy_road.goal_row, self.crossy_road.road_count]))
-        for road in self.crossy_road.road_rows:
-            obs = np.concatenate((obs, [road[0], road[1]]))
-        for car in self.crossy_road.cars:
-            obs =  np.concatenate((obs, [car.row, car.column, car.direction]))
+        # 1. 收集當前所有資訊
+        numeric_data_list = list(self.crossy_road.pedestrian_pos) + [self.crossy_road.goal_row, self.crossy_road.road_count]
+        
+        for road in self.crossy_road.road_rows[:10]:
+            dir_num = 0 if road[1] == 'L' else 1
+            numeric_data_list.extend([road[0], dir_num])
+
+        # 【修改點】加入車子的速度與長度資訊
+        for car in self.crossy_road.cars[:20]:
+            dir_num = 0 if car.direction == 'L' else 1
+            
+            # 加入 5 個特徵：行, 列, 方向, 速度, 長度
+            numeric_data_list.extend([
+                car.row, 
+                car.column, 
+                dir_num,
+                car.speed,  # 新增：讓 AI 知道這台車有多快
+                car.length  # 新增：讓 AI 知道這台車有多長
+            ])
+
+        # 2. 轉成 numpy array
+        current_data = np.array(numeric_data_list, dtype=np.int32)
+        
+        # 3. 補零 (Padding) - 注意這裡會自動使用上面更新過的 self.max_obs_len
+        obs = np.zeros(self.max_obs_len, dtype=np.int32)
+        length = min(len(current_data), self.max_obs_len)
+        obs[:length] = current_data[:length]
+        
         return obs
 
     # Gym required function (and parameters) to reset the environment
     def reset(self, seed=None, options=None):
-        super().reset(seed=seed) # gym requires this call to control randomness and reproduce scenarios.
-
-        # Reset the CrossyRoad. Optionally, pass in seed control randomness and reproduce scenarios.
+        super().reset(seed=seed) 
+        # 呼叫 crossy_road.py 裡面的重置邏輯
         self.crossy_road.reset(seed=seed)
-
-        # Construct the observation state:
-        # [pedestrian_row_pos, pedestrian_col_pos, goal_row, road_count, road_rows, road_direction (for each road), car_row_pos, car_col_pos, car_direction (for each car)]
-        obs = self._get_obs()
         
-        # Additional info to return. For debugging or whatever.
-        info = {}
+        # 初始化計步器
+        self.current_step = 0 
 
-        # Render environment
+        obs = self._get_obs()
+        info = {}
+        
         if(self.render_mode=='human'):
             self.render()
 
-        # Return observation and info
         return obs, info
-
     # Gym required function (and parameters) to perform an action
     def step(self, action):
-        # Backup the previous pedestrian position, to calculate distance change later
-        old_pos = self.crossy_road.pedestrian_pos.copy()
-        # Perform action
+        # 1. 執行動作
         target_reached = self.crossy_road.perform_action(cr.PedestrianAction(action))
 
-        # Determine reward and termination
-        reward = 0
-        terminated=False
-
-        # Check for goal reached or collision
+        # 2. [關鍵修改] 最高優先級檢查：如果贏了，直接結束！
+        # 不要再讓車子移動，也不要再檢查碰撞，直接發獎勵並回傳。
         if target_reached:
-            reward += 100
-            terminated=True
-            print("Goal Reached!")
-        else:
-            # Move cars
-            self.crossy_road.car_positions = [] # Clear car positions, will be updated after moving cars
-            for car in self.crossy_road.cars:
-                car.move()
-                # Update car positions
-                for pos in car.get_occupied_pos():
-                    self.crossy_road.car_positions.append(pos)
-                # Check for collision
-                if car.get_front_pos() == self.crossy_road.pedestrian_pos:
-                    reward -= 100
-                    terminated = True
-                    print("Crashed by a car!")
-                # Re-spawn car if out of bounds
-                if car.is_out_of_bounds(self.crossy_road.grid_cols):
-                    car.reset()
-            # Reward for moving closer to goal, penalty for moving away, small penalty for no progress
-            old_dist = abs(old_pos[0] - self.crossy_road.goal_row)
-            new_dist = abs(self.crossy_road.pedestrian_pos[0] - self.crossy_road.goal_row)
-            if new_dist < old_dist:
-                reward += 5
-            elif new_dist > old_dist:
-                reward -= 5
-            else:
-                reward -= 0.5
+            reward = 100
+            terminated = True
+            truncated = False
+            info = {}
+            # print("Goal Reached!")
+            
+            # 必須在這裡直接 return obs (雖然車沒動，但反正遊戲結束了)
+            # 這裡回傳當前畫面即可
+            obs = self._get_obs()
+            return obs, reward, terminated, truncated, info
 
-        # Construct the observation state: 
-        # [pedestrian_row_pos, pedestrian_col_pos, goal_row]
+        # --- 以下是沒贏的情況，才需要計算車子移動和碰撞 ---
+        
+        reward = 0
+        terminated = False
+        truncated = False
+        
+        # 3. 步數計數
+        self.current_step += 1
+        
+        # 4. 移動車子 & 碰撞檢測 (保持原本邏輯)
+        self.crossy_road.car_positions = [] 
+        for i, car in enumerate(self.crossy_road.cars):
+            car.move()
+            
+            # [修改] 如果車子跑出邊界，不僅重置位置，還 "換一台新車"
+            if car.is_out_of_bounds(self.crossy_road.grid_cols):
+                # 1. 取得舊車的資訊 (保留原本的行數和方向)
+                row = car.row
+                direction = car.direction
+                
+                # 2. 隨機選一個新車種 (需要引入 random 和 crossy_road classes)
+                import random
+                # 這裡需要引用 crossy_road 裡的類別
+                VehicleClass = random.choice([cr.Bus, cr.Taxi, cr.Bike, cr.SportCar])
+                
+                # 3. 建立新車 (記得傳入 grid_cols)
+                new_car = VehicleClass(row, direction, grid_cols=self.crossy_road.grid_cols)
+                self.crossy_road.cars[i] = new_car
+                car = new_car
+                # 4. 替換掉列表中的舊車
+                self.crossy_road.cars[i] = new_car
+                
+                # 讓這台新車也加入當前的渲染位置 (避免剛生成閃爍)
+                car = new_car
+            current_car_pixels = car.get_occupied_pos()
+            for pos in current_car_pixels:
+                self.crossy_road.car_positions.append(pos)
+            
+            # 碰撞檢測
+            if self.crossy_road.pedestrian_pos in current_car_pixels:
+                reward -= 200 
+                terminated = True
+                # print("Crashed!")
+
+        # 5. 時間懲罰 (保持原本邏輯)
+        reward -= 0.01
+
+        # 6. 超時檢測 (保持原本邏輯)
+        if self.current_step >= self.max_episode_steps:
+            truncated = True
+            
+        # 7. 回傳
         obs = self._get_obs()
-
-        # Additional info to return. For debugging or whatever.
         info = {}
-
-        # Render environment
         if(self.render_mode=='human'):
-            print(cr.PedestrianAction(action))
             self.render()
 
-        # Return observation, reward, terminated, truncated (not used), info
-        return obs, reward, terminated, False, info
-
+        return obs, reward, terminated, truncated, info
     # Gym required function to render environment
     def render(self):
         self.crossy_road.render()
