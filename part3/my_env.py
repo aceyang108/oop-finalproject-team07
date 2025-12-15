@@ -27,7 +27,7 @@ class CrossyRoadEnv(gym.Env):
         self.render_mode = render_mode
 
         # Initialize the CrossyRoad problem
-        self.crossy_road = cr.CrossyRoad(grid_rows=grid_rows, grid_cols=grid_cols, fps=self.metadata['render_fps'], road_count=2)
+        self.crossy_road = cr.CrossyRoad(grid_rows=grid_rows, grid_cols=grid_cols, fps=self.metadata['render_fps'], road_count=2, rand_seed=217201)
 
         # Gym requires defining the action space. The action space is robot's set of possible actions.
         # Training code can call action_space.sample() to randomly select an action. 
@@ -42,6 +42,7 @@ class CrossyRoadEnv(gym.Env):
             dtype=np.int32
         )
 
+    # Get the observation state:
     # [pedestrian_row_pos, pedestrian_col_pos, goal_row, road_count, road_rows, road_direction (for each road), car_row_pos, car_col_pos, car_direction (for each car)]
     def _get_obs(self):
         obs = np.concatenate((self.crossy_road.pedestrian_pos, [self.crossy_road.goal_row, self.crossy_road.road_count]))
@@ -74,6 +75,7 @@ class CrossyRoadEnv(gym.Env):
 
     # Gym required function (and parameters) to perform an action
     def step(self, action):
+        # Backup the previous pedestrian position, to calculate distance change later
         old_pos = self.crossy_road.pedestrian_pos.copy()
         # Perform action
         target_reached = self.crossy_road.perform_action(cr.PedestrianAction(action))
@@ -82,36 +84,36 @@ class CrossyRoadEnv(gym.Env):
         reward = 0
         terminated=False
 
+        # Check for goal reached or collision
         if target_reached:
             reward += 100
             terminated=True
             print("Goal Reached!")
         else:
             # Move cars
-            self.crossy_road.car_positions = []
+            self.crossy_road.car_positions = [] # Clear car positions, will be updated after moving cars
             for car in self.crossy_road.cars:
                 car.move()
+                # Update car positions
                 for pos in car.get_occupied_pos():
                     self.crossy_road.car_positions.append(pos)
                 # Check for collision
-                if car.get_head_pos() == self.crossy_road.pedestrian_pos:
+                if car.get_front_pos() == self.crossy_road.pedestrian_pos:
                     reward -= 100
                     terminated = True
                     print("Crashed by a car!")
                 # Re-spawn car if out of bounds
                 if car.is_out_of_bounds(self.crossy_road.grid_cols):
                     car.reset()
-                for pos in car.get_occupied_pos():
-                    self.crossy_road.car_positions.append(pos)
-            # Small reward for moving closer to goal
+            # Reward for moving closer to goal, penalty for moving away, small penalty for no progress
             old_dist = abs(old_pos[0] - self.crossy_road.goal_row)
             new_dist = abs(self.crossy_road.pedestrian_pos[0] - self.crossy_road.goal_row)
             if new_dist < old_dist:
-                reward += 1
+                reward += 5
             elif new_dist > old_dist:
-                reward -= 1
+                reward -= 5
             else:
-                reward -= 0.1
+                reward -= 0.5
 
         # Construct the observation state: 
         # [pedestrian_row_pos, pedestrian_col_pos, goal_row]
