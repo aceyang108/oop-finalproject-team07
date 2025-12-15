@@ -138,4 +138,4 @@ Bash
 Then open your browser and go to: [http://localhost:6006/](https://www.google.com/search?q=http://localhost:6006/)
 ---
 # Contribute
-aceyang108 : part2(frozen_lake.py, test.py)
+aceyang108 : part2(frozen_lake.py, test.py)、reflection report
