@@ -67,22 +67,35 @@ python mountain_car.py --render --episodes 10
 ```
 
 ### **Part 2: Frozen Lake**
-從零開始訓練一個新的 Agent，訓練完成後會自動儲存最佳模型至frozen_lake8x8.pkl並繪製訓練曲線圖。
-我以Tabular Q-Learning為主，結合Epsilon-Greedy，最後再用雙重線性衰減來優化。有使用了OOP的設計架構。
+此部分實作了 Tabular Q-Learning 演算法，並結合 Epsilon-Greedy 策略與 雙重參數衰減 (Dual Parameter Decay) 機制來優化收斂過程。程式碼採用 OOP (物件導向) 架構設計，具備高模組化與可維護性。
+
+若要使用視覺化功能 (--render)、請務必先安裝pygame
+```bash
+pip install "gymnasium[toy-text]" pygame
+```
+
+訓練模型，會自動儲存模型至 frozen_lake8x8.pkl 並繪製訓練曲線圖。
 ```bash
 # 預設training(15,000 episodes)
 python frozen_lake.py --train
 
 # 可自訂回合數
 python frozen_lake.py --train --episodes 10000
+```
 
+讀取訓練好的模型，實際演示 Agent 在冰湖上的行走過程。
+```bash
 #實際跑十次
 python frozen_lake.py --render
 ```
 
 我有另外寫個測試用腳本
 ```bash
+# 預設執行 (10 episodes, Render ON)
 python test.py
+
+# 自訂播放回合數 (例如 5 回合)
+python test.py --episodes 5
 
 #快速跑完 1000 回合並計算最終平均勝率
 python test.py --benchmark
@@ -125,6 +138,6 @@ Bash
 Then open your browser and go to: [http://localhost:6006/](https://www.google.com/search?q=http://localhost:6006/)
 ---
 # Contribute
-aceyang108 : part2(frozen_lake.py, test.py)
+aceyang108 : part2(frozen_lake.py, test.py)、reflection report
 Chiu0918: refined part3 (multiple vehicle classes, varied map layouts, agent.py), part3 demo slide
 MikanLord173: part3 base structure (my_env.py, crossy_road.py), uml graph
