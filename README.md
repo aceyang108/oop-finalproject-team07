@@ -139,3 +139,5 @@ Then open your browser and go to: [http://localhost:6006/](https://www.google.c
 ---
 # Contribute
 aceyang108 : part2(frozen_lake.py, test.py)、reflection report
+Chiu0918: refined part3 (multiple vehicle classes, varied map layouts, agent.py), part3 demo slide
+MikanLord173: part3 base structure (my_env.py, crossy_road.py), uml graph
