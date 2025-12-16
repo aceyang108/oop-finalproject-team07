@@ -285,9 +285,45 @@ class CrossyRoad:
         return self.pedestrian_pos[0] == self.goal_row
 
     def render(self):
-        """渲染遊戲畫面"""
+        """渲染遊戲畫面 (包含終端機文字輸出與 Pygame 視窗繪圖)"""
         self._process_events()
 
+        # --- Part 1: 終端機文字輸出 (Console Output) ---        
+        for r in range(self.grid_rows):
+            for c in range(self.grid_cols):
+                
+                # 1. 檢查是否是行人 (最優先顯示)
+                if [r, c] == self.pedestrian_pos:
+                    # 如果行人跟車子重疊 -> 撞車 (X)
+                    if [r, c] in self.car_positions:
+                        print(GridTile.X_CRASH, end=' ')
+                    else:
+                        print(GridTile.PEDESTRIAN, end=' ')
+                
+                # 2. 檢查是否是終點
+                elif r == self.goal_row:
+                    print(GridTile.GOAL, end=' ')
+                
+                # 3. 檢查是否是道路
+                elif r in [row for row, _ in self.road_rows]:
+                    # 如果這格有車 -> 顯示車 (C)
+                    if [r, c] in self.car_positions:
+                        print(GridTile.CAR, end=' ')
+                    else:
+                        print(GridTile._ROAD, end=' ')
+                
+                # 4. 其他就是地板
+                else:
+                    print(GridTile._FLOOR, end=' ')
+            
+            # 每一列印完換行
+            print()
+        
+        # 整個畫面印完，多空一行分隔
+        print()
+
+
+        # --- Part 2: Pygame 視窗繪圖 (Graphical Output) ---        
         # 清空畫面為白色背景
         self.window_surface.fill((255, 255, 255))
 
@@ -316,17 +352,13 @@ class CrossyRoad:
                                 break
                         
                         if current_car:
-                            # 計算此格是車輛的第幾個部分（0=車頭, 1=車身1, 2=車身2...）
+                            # 計算此格是車輛的第幾個部分
                             segment_index = abs(c - current_car.column)
-                            
-                            # 取得對應車種的圖片列表
                             car_images = self.vehicle_sprites[current_car.type_name][current_car.direction]
                             
-                            # 安全檢查：確保索引不超過圖片數量
                             if segment_index < len(car_images):
                                 self.window_surface.blit(car_images[segment_index], pos)
                             else:
-                                # 圖片不足時，使用最後一張作為備用
                                 self.window_surface.blit(car_images[-1], pos)
                 
                 # 繪製一般地板
@@ -349,7 +381,7 @@ class CrossyRoad:
 
         pygame.display.update()
         self.clock.tick(self.fps)
-        
+              
     def _process_events(self):
         """處理使用者事件（關閉視窗、按鍵等）"""
         for event in pygame.event.get():
