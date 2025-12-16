@@ -138,6 +138,6 @@ Bash
 Then open your browser and go to: [http://localhost:6006/](https://www.google.com/search?q=http://localhost:6006/)
 ---
 # Contribute
-- aceyang108 : part2(frozen_lake.py, test.py)、reflection report
+- aceyang108 : part2(frozen_lake.py, test.py)、modify crossy_road.py to be more OOP、reflection report、part2 demo slide
 - Chiu0918: refined part3 (multiple vehicle classes, varied map layouts, agent.py), part3 demo slide
 - MikanLord173: part3 base structure (my_env.py, crossy_road.py), uml graph
